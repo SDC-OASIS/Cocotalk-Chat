@@ -12,8 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Optional;
+import reactor.core.publisher.Mono;
 
 @Slf4j
 @Controller
@@ -24,16 +23,20 @@ public class RoomController {
     private final RoomMapper roomMapper;
 
     @PostMapping
-    public ResponseEntity<?> createRoom(@RequestBody RoomRequest request){
-        Room room = roomService.createRoom(roomMapper.toEntity(request));
-        RoomResponse data = roomMapper.toDto(room);
-        return new ResponseEntity<>(new GlobalResponse<>(data), HttpStatus.CREATED);
+    public Mono<ResponseEntity<?>> createRoom(@RequestBody RoomRequest request){
+        Mono<Room> roomMono = roomService.createRoom(roomMapper.toEntity(request));
+        return roomMono.map(room -> {
+            RoomResponse data = roomMapper.toDto(room);
+            return new ResponseEntity<>(new GlobalResponse<>(data), HttpStatus.CREATED);
+        });
     }
 
     @GetMapping("/private")
-    public ResponseEntity<?> findPrivateRoom(@RequestParam Long myid, @RequestParam Long friendid){
-        Optional<Room> roomOptional = roomService.findPrivateRoom(myid, friendid);
-        RoomResponse data = roomOptional.map(roomMapper::toDto).orElse(null);
-        return new ResponseEntity<>(new GlobalResponse(data), HttpStatus.OK);
+    public Mono<?> findPrivateRoom(@RequestParam Long myid, @RequestParam Long friendid){
+        Mono<Room> roomMono = roomService.findPrivateRoom(myid, friendid);
+        return roomMono.map(room -> {
+            RoomResponse data = roomMapper.toDto(room);
+            return new ResponseEntity<>(new GlobalResponse<>(data), HttpStatus.CREATED);
+        }).switchIfEmpty(Mono.just(new ResponseEntity<>(new GlobalResponse<>(null), HttpStatus.CREATED)));
     }
 }

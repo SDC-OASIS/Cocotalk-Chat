@@ -7,8 +7,7 @@ import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import java.util.Optional;
+import reactor.core.publisher.Mono;
 
 @Service
 @RequiredArgsConstructor
@@ -17,11 +16,11 @@ public class RoomService {
 
     QRoom qRoom = QRoom.room;
 
-    public Room createRoom(Room room){
+    public Mono<Room> createRoom(Room room){
         return roomRepository.save(room);
     }
 
-    public Optional<Room> findPrivateRoom(Long myid, Long friendid) {
+    public Mono<Room> findPrivateRoom(Long myid, Long friendid) {
         Predicate myIdPredicate = qRoom.members.get(0).userId.in(myid, friendid);
         Predicate friendIdPredicate = qRoom.members.get(1).userId.in(myid, friendid);
         Predicate sizePredicate = qRoom.members.size().eq(2);
