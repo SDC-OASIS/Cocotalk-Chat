@@ -52,14 +52,14 @@ public class UserArgumentResolver implements HandlerMethodArgumentResolver {
             WebDataBinderFactory binderFactory
     ){
         HttpServletRequest req = (HttpServletRequest) webRequest.getNativeRequest();
-        String token = req.getHeader(TOKEN_HEADER_NAME);
-        if (!StringUtils.hasLength(token)) throw new CustomException(CustomError.NOT_LOGIN);
+        String accessToken = req.getHeader(TOKEN_HEADER_NAME);
+        if (!StringUtils.hasLength(accessToken)) throw new CustomException(CustomError.NOT_LOGIN);
+
+        TokenPayload payload = JwtUtil.getPayload(accessToken);
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set(TOKEN_HEADER_NAME, token);
+        headers.set(TOKEN_HEADER_NAME, accessToken);
         HttpEntity<HttpHeaders> request = new HttpEntity<>(headers);
-
-        TokenPayload payload = JwtUtil.getPayload();
 
         UriComponentsBuilder uriComponentsBuilder =
                 UriComponentsBuilder.fromHttpUrl(USER_SERVICE_URL);

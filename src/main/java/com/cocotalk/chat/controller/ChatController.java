@@ -1,18 +1,22 @@
 package com.cocotalk.chat.controller;
 
 import com.cocotalk.chat.domain.vo.*;
+import com.cocotalk.chat.dto.TokenPayload;
 import com.cocotalk.chat.dto.request.ChatMessageRequest;
 import com.cocotalk.chat.dto.request.InviteMessageRequest;
 import com.cocotalk.chat.dto.request.RoomRequest;
-import com.cocotalk.chat.service.kafka.KafkaProducer;
+import com.cocotalk.chat.exception.CustomError;
+import com.cocotalk.chat.exception.CustomException;
 import com.cocotalk.chat.service.RoomService;
+import com.cocotalk.chat.service.kafka.KafkaProducer;
+import com.cocotalk.chat.utils.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
@@ -39,14 +43,17 @@ public class ChatController {
     public String index() {
         return "index";
     }
-
     /**
      * 채팅방 생성 /chatroom/new
      *
      * @param roomRequest 새로운 채팅방 생성을 요청하는 모델
      */
     @MessageMapping("/new")
-    public void createRoom(@Payload RoomRequest roomRequest) {
+    public void createRoom(@Header("X-ACCESS-TOKEN") String accessToken, @Payload RoomRequest roomRequest) {
+        TokenPayload payload = JwtUtil.getPayload(accessToken);
+        if(!payload.getUserId().equals(roomRequest.getUserId()))
+            throw new CustomException(CustomError.STOMP, "메시지와 Access Token의 값이 일치하지 않습니다.");
+
         RoomVo roomVo = roomService.create(roomRequest); // (1) 메시지 수신 후 방 생성
         int size = roomVo.getMembers().size();
         for(int i = 0; i < size; ++i) { // (2) 방 생성 정보를 채팅방에 포함된 멤버들에게 pub
@@ -63,7 +70,12 @@ public class ChatController {
      */
     @MessageMapping("/{roomId}/message/send")
     public void send(@DestinationVariable ObjectId roomId,
-                            @Payload ChatMessageRequest chatMessageRequest) {
+                     @Header("X-ACCESS-TOKEN") String accessToken,
+                     @Payload ChatMessageRequest chatMessageRequest) {
+        TokenPayload payload = JwtUtil.getPayload(accessToken);
+        if(!payload.getUserId().equals(chatMessageRequest.getUserId()))
+            throw new CustomException(CustomError.STOMP, "메시지와 Access Token의 값이 일치하지 않습니다.");
+
         MessageVo<ChatMessageVo> messageVo = roomService.saveChatMessage(roomId, chatMessageRequest);
         List<Long> receiverIds = chatMessageRequest.getReceiverIds();
 
@@ -84,7 +96,12 @@ public class ChatController {
      */
     @MessageMapping("/{roomId}/message/invite")
     public void invite(@DestinationVariable ObjectId roomId,
-                                  @Payload InviteMessageRequest inviteMessageRequest) {
+                       @Header("X-ACCESS-TOKEN") String accessToken,
+                       @Payload InviteMessageRequest inviteMessageRequest) {
+        TokenPayload payload = JwtUtil.getPayload(accessToken);
+        if(!payload.getUserId().equals(inviteMessageRequest.getUserId()))
+            throw new CustomException(CustomError.STOMP, "메시지와 Access Token의 값이 일치하지 않습니다.");
+
         MessageWithRoomVo<InviteMessageVo> messageWithRoomVo = roomService.saveInviteMessage(roomId, inviteMessageRequest);
 
         MessageVo<InviteMessageVo> inviteMessageVo = messageWithRoomVo.getMessageVo();
@@ -107,8 +124,12 @@ public class ChatController {
      */
     @MessageMapping("/{roomId}/message/leave")
     public void leave(@DestinationVariable ObjectId roomId,
-                               @Payload ChatMessageRequest leaveMessageRequest,
-                               SimpMessageHeaderAccessor headerAccessor) {
+                      @Header("X-ACCESS-TOKEN") String accessToken,
+                      @Payload ChatMessageRequest leaveMessageRequest) {
+        TokenPayload payload = JwtUtil.getPayload(accessToken);
+        if(!payload.getUserId().equals(leaveMessageRequest.getUserId()))
+            throw new CustomException(CustomError.STOMP, "메시지와 Access Token의 값이 일치하지 않습니다.");
+
         MessageWithRoomVo<ChatMessageVo> messageWithRoomVo = roomService.saveLeaveMessage(roomId, leaveMessageRequest);
         MessageVo<ChatMessageVo> messageVo = messageWithRoomVo.getMessageVo();
         RoomVo roomVo = messageWithRoomVo.getRoomVo();
@@ -130,7 +151,12 @@ public class ChatController {
      */
     @MessageMapping("/{roomId}/message/awake")
     public void awake(@DestinationVariable ObjectId roomId,
+                      @Header("X-ACCESS-TOKEN") String accessToken,
                       @Payload ChatMessageRequest awakeMessageRequest) {
+        TokenPayload payload = JwtUtil.getPayload(accessToken);
+        if(!payload.getUserId().equals(awakeMessageRequest.getUserId()))
+            throw new CustomException(CustomError.STOMP, "메시지와 Access Token의 값이 일치하지 않습니다.");
+
         MessageWithRoomVo<ChatMessageVo> messageWithRoomVo = roomService.saveAwakeMessage(roomId, awakeMessageRequest);
         MessageVo<ChatMessageVo> messageVo = messageWithRoomVo.getMessageVo();
         RoomVo roomVo = messageWithRoomVo.getRoomVo();
